@@ -1,19 +1,17 @@
-// Cached values stored in memory
 let cachedRating = null;
 let cachedAt = null;
 
-import fetch from "node-fetch";
-
 export default async function handler(req, res) {
-  const username = req.query.username || "vsandeep_11"; // default username
-  const CACHE_DURATION = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
+  const username = req.query.username || "vsandeep_11";   
+  const CACHE_TIME = 24 * 60 * 60 * 1000; // 24 hours
 
-  // If cached and still fresh → return cached badge
-  if (cachedRating !== null && cachedAt && Date.now() - cachedAt < CACHE_DURATION) {
-    const cachedBadge = `https://img.shields.io/badge/Contest%20Rating-${encodeURIComponent(
-      cachedRating
-    )}-blue?style=flat-square`;
-    return res.redirect(cachedBadge);
+  // Serve from cache
+  if (cachedRating !== null && cachedAt && Date.now() - cachedAt < CACHE_TIME) {
+    return res.redirect(
+      `https://img.shields.io/badge/Contest%20Rating-${encodeURIComponent(
+        cachedRating
+      )}-blue?style=flat-square`
+    );
   }
 
   try {
@@ -27,32 +25,28 @@ export default async function handler(req, res) {
 
     const response = await fetch("https://leetcode.com/graphql/", {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        query,
-        variables: { username },
-      }),
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, variables: { username } }),
     });
 
-    const data = await response.json();
+    const json = await response.json();
+
     const rating =
-      data?.data?.userContestRanking?.rating !== null
-        ? Math.round(data.data.userContestRanking.rating)
+      json?.data?.userContestRanking?.rating !== null &&
+      json?.data?.userContestRanking?.rating !== undefined
+        ? Math.round(json.data.userContestRanking.rating)
         : "inaccessible";
 
-    // Save to cache
+    // Cache the result
     cachedRating = rating;
     cachedAt = Date.now();
 
-    // Generate badge
-    const badgeUrl = `https://img.shields.io/badge/Contest%20Rating-${encodeURIComponent(
-      rating
-    )}-blue?style=flat-square`;
-
-    return res.redirect(badgeUrl);
-  } catch (error) {
+    return res.redirect(
+      `https://img.shields.io/badge/Contest%20Rating-${encodeURIComponent(
+        rating
+      )}-blue?style=flat-square`
+    );
+  } catch (err) {
     return res.redirect(
       "https://img.shields.io/badge/Contest%20Rating-inaccessible-lightgrey?style=flat-square"
     );
